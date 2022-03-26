@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+
+import sys,os
+import requests
+from picamera import PiCamera
+from time import sleep
+import urllib3
+from dotenv import load_dotenv
+
+load_dotenv()
+
+MVIE_HOST     = os.getenv('MVIE_HOST')
+MVIE_USER     = os.getenv('MVIE_USER')
+MVIE_PASSWORD = os.getenv('MVIE_PASSWORD')
+MVIE_CERT     = os.getenv('MVIE_CERT')
+MVIE_DEVICE   = os.getenv('MVIE_DEVICE')
+
+PI_CAM_IMAGE_WIDTH  = int( os.getenv('PI_CAM_IMAGE_WIDTH') or 640 )
+PI_CAM_IMAGE_HEIGHT = int( os.getenv('PI_CAM_IMAGE_HEIGHT') or 480 )
+
+# disable an annoying warning
+urllib3.disable_warnings(urllib3.exceptions.SubjectAltNameWarning)
+
+####### Step 1: Get a session token from MVI Edge
+
+SESSION_URL = f"https://{MVIE_HOST}/api/v1/users/sessions"
+
+def fetchToken():
+
+    response = requests.post(
+        SESSION_URL,
+        json = {
+            "grant_type": "password",
+            "password": MVIE_PASSWORD,
+            "username": MVIE_USER
+        },
+        verify = MVIE_CERT
+    )
+
+    if (response.status_code != 200):
+        print(f"HTTP({respnose.status_code}) Unable to log into {MVIE_HOST}")
+        exit(1)
+
+    body = response.json()
+
+    return body['token']
+
+token = fetchToken()
+
+###### Step 2: Get the UUID for the requested device
+
+def fetchDeviceID(deviceName):
+
+    response = requests.get(
+        f"https://{MVIE_HOST}/api/v1/devices",
+        headers = { "mvie-controller": token },
+        verify = MVIE_CERT
+    )
+
+    devices = response.json()
+
+    for device in devices:
+        if device['name'] == deviceName:
+            return device['uuid']
+    
+    print(f"Device '{deviceName}' not found")
+    quit();
+
+###### Step 3: Get Ready To Start Capturing Images
+
+camera = PiCamera(
+    resolution=(PI_CAM_IMAGE_WIDTH,PI_CAM_IMAGE_HEIGHT)
+)
+
+camera.start_preview()
+
+CAPTURE_PATH  = "/tmp/mvi-edge-caputure.jpg"
+IMAGE_UPLOAD_URL = f"https://{MVIE_HOST}/api/v1/devices/images?uuid={fetchDeviceID(MVIE_DEVICE)}"
+
+def uploadCameraImage():
+    camera.capture(CAPTURE_PATH)
+    response = requests.post(
+        IMAGE_UPLOAD_URL,
+        files = { 'file': ('singleshot.jpg', open(CAPTURE_PATH,'rb') )},
+        headers = { "mvie-controller": token },
+        verify = MVIE_CERT
+    )
+
+    if (response.status_code != 200):
+        print(f"HTTP({respnose.status_code}) Unable to upload image to {MVIE_HOST}")
+        exit(1)
+
+    return True
+
+print("waiting for camera to initialize")
+sleep(2) # wait for the camera to warm up
+
+###### Step 4: Capture and upload images as needed...
+
+count = 0
+while True:
+    uploadCameraImage()
+    print(".", end = '', flush = True)
+    count = count + 1
+    if (count % 25 == 0):
+        print("", flush = True)
+    sleep(.5)
