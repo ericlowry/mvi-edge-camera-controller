@@ -6,39 +6,56 @@ from picamera import PiCamera
 from time import sleep
 import urllib3
 from dotenv import load_dotenv
+import argparse
+import paho.mqtt.client as mqtt
 
 load_dotenv()
 
-MVIE_HOST     = os.getenv('MVIE_HOST')
-MVIE_USER     = os.getenv('MVIE_USER')
-MVIE_PASSWORD = os.getenv('MVIE_PASSWORD')
-MVIE_CERT     = os.getenv('MVIE_CERT')
-MVIE_DEVICE   = os.getenv('MVIE_DEVICE')
+cli = argparse.ArgumentParser( description='IBM MVI Edge Camera Controller' )
 
-PI_CAM_IMAGE_WIDTH  = int( os.getenv('PI_CAM_IMAGE_WIDTH') or 640 )
-PI_CAM_IMAGE_HEIGHT = int( os.getenv('PI_CAM_IMAGE_HEIGHT') or 480 )
+cli.add_argument('--host', help = 'Hostname', default = os.getenv('MVIE_HOST') )
+cli.add_argument('--user', help = 'User Name', default = os.getenv('MVIE_USER') )
+cli.add_argument('--password', help = 'Password', default = os.getenv('MVIE_PASSWORD') )
+cli.add_argument('--cert', help = 'CA Cert File', default = os.getenv('MVIE_CERT') )
+cli.add_argument('--device', help = 'Input Device Name', default = os.getenv('MVIE_DEVICE') )
+
+cli.add_argument('--width', help = 'Capture Width', type=int, default=os.getenv('PI_CAM_IMAGE_WIDTH') )
+cli.add_argument('--height', help = 'Capture Height', type=int, default = os.getenv('PI_CAM_IMAGE_HEIGHT') )
+
+cli.add_argument('-v', '--verbose', help = 'Verbose', action = 'store_true', default = False )
+cli.add_argument('--preview', help = 'Verbose', action = 'store_true', default = False )
+
+args = cli.parse_args()
+
+print(args)
 
 # disable an annoying warning
 urllib3.disable_warnings(urllib3.exceptions.SubjectAltNameWarning)
 
+def debug(msg='', end=None, flush=False):
+    if (args.verbose):
+        print(msg, end=end, flush=flush)
+    
 ####### Step 1: Get a session token from MVI Edge
 
-SESSION_URL = f"https://{MVIE_HOST}/api/v1/users/sessions"
+SESSION_URL = f"https://{args.host}/api/v1/users/sessions"
 
 def fetchToken():
+
+    debug('fetching access token')
 
     response = requests.post(
         SESSION_URL,
         json = {
             "grant_type": "password",
-            "password": MVIE_PASSWORD,
-            "username": MVIE_USER
+            "password": args.password,
+            "username": args.user
         },
-        verify = MVIE_CERT
+        verify = args.cert
     )
 
     if (response.status_code != 200):
-        print(f"HTTP({respnose.status_code}) Unable to log into {MVIE_HOST}")
+        print(f"HTTP({respnose.status_code}) Unable to log into {args.host}")
         exit(1)
 
     body = response.json()
@@ -51,10 +68,12 @@ token = fetchToken()
 
 def fetchDeviceID(deviceName):
 
+    debug(f"fetching device id for {deviceName}")
+
     response = requests.get(
-        f"https://{MVIE_HOST}/api/v1/devices",
+        f"https://{args.host}/api/v1/devices",
         headers = { "mvie-controller": token },
-        verify = MVIE_CERT
+        verify = args.cert
     )
 
     devices = response.json()
@@ -68,14 +87,16 @@ def fetchDeviceID(deviceName):
 
 ###### Step 3: Get Ready To Start Capturing Images
 
+debug(f"starting camera({args.width}x{args.height})")
+
 camera = PiCamera(
-    resolution=(PI_CAM_IMAGE_WIDTH,PI_CAM_IMAGE_HEIGHT)
+    resolution = ( args.width, args.height )
 )
 
 camera.start_preview()
 
 CAPTURE_PATH  = "/tmp/mvi-edge-caputure.jpg"
-IMAGE_UPLOAD_URL = f"https://{MVIE_HOST}/api/v1/devices/images?uuid={fetchDeviceID(MVIE_DEVICE)}"
+IMAGE_UPLOAD_URL = f"https://{args.host}/api/v1/devices/images?uuid={fetchDeviceID(args.device)}"
 
 def uploadCameraImage():
     camera.capture(CAPTURE_PATH)
@@ -83,25 +104,40 @@ def uploadCameraImage():
         IMAGE_UPLOAD_URL,
         files = { 'file': ('singleshot.jpg', open(CAPTURE_PATH,'rb') )},
         headers = { "mvie-controller": token },
-        verify = MVIE_CERT
+        verify = args.cert
     )
 
     if (response.status_code != 200):
-        print(f"HTTP({respnose.status_code}) Unable to upload image to {MVIE_HOST}")
+        print(f"HTTP({respnose.status_code}) Unable to upload image to {args.host}")
         exit(1)
 
     return True
 
-print("waiting for camera to initialize")
+debug("waiting for camera to initialize")
+
 sleep(2) # wait for the camera to warm up
 
 ###### Step 4: Capture and upload images as needed...
 
-count = 0
-while True:
-    uploadCameraImage()
-    print(".", end = '', flush = True)
-    count = count + 1
-    if (count % 25 == 0):
-        print("", flush = True)
-    sleep(.5)
+if (args.preview):
+
+    debug("sending images")
+    count = 0
+    while (True):
+        uploadCameraImage()
+        debug(".", end = '', flush = True)
+        count = count + 1
+        if (count % 25 == 0):
+            debug("", flush = True)
+            sleep(.25)
+
+else:
+
+    debug()
+    
+    count = 0
+    while (True):
+
+        id = input(f"({count}) Image ID: ")
+        uploadCameraImage()
+        count = count + 1
