@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 
-import sys,os
+import sys, os, time
 import requests
 from picamera import PiCamera
-from time import sleep
 import urllib3
 from dotenv import load_dotenv
 import argparse
-import paho.mqtt.client as mqtt
+import paho.mqtt.client as MQTT_Client
 
 load_dotenv()
 
 cli = argparse.ArgumentParser( description='IBM MVI Edge Camera Controller' )
+
+cli.add_argument('-v', '--verbose', help = 'Display Debug Messages', action = 'store_true', default = False )
 
 cli.add_argument('--host', help = 'Hostname', default = os.getenv('MVIE_HOST') )
 cli.add_argument('--user', help = 'User Name', default = os.getenv('MVIE_USER') )
@@ -19,23 +20,25 @@ cli.add_argument('--password', help = 'Password', default = os.getenv('MVIE_PASS
 cli.add_argument('--cert', help = 'CA Cert File', default = os.getenv('MVIE_CERT') )
 cli.add_argument('--device', help = 'Input Device Name', default = os.getenv('MVIE_DEVICE') )
 
+cli.add_argument('--mqtt-port', help = 'MQTT Port', type=int, default = os.getenv('MQTT_PORT') )
+cli.add_argument('--mqtt-trigger', help = 'MQTT Trigger', default = os.getenv('MQTT_TRIGGER') )
+
 cli.add_argument('--width', help = 'Capture Width', type=int, default=os.getenv('PI_CAM_IMAGE_WIDTH') )
 cli.add_argument('--height', help = 'Capture Height', type=int, default = os.getenv('PI_CAM_IMAGE_HEIGHT') )
 
-cli.add_argument('-v', '--verbose', help = 'Verbose', action = 'store_true', default = False )
-cli.add_argument('--preview', help = 'Verbose', action = 'store_true', default = False )
-
-args = cli.parse_args()
-
-print(args)
-
-# disable an annoying warning
-urllib3.disable_warnings(urllib3.exceptions.SubjectAltNameWarning)
+cli.add_argument('--preview', help = 'Preview Mode', action = 'store_true', default = False )
 
 def debug(msg='', end=None, flush=False):
     if (args.verbose):
         print(msg, end=end, flush=flush)
     
+args = cli.parse_args()
+
+debug(args)
+
+# disable an annoying warning
+urllib3.disable_warnings(urllib3.exceptions.SubjectAltNameWarning)
+
 ####### Step 1: Get a session token from MVI Edge
 
 SESSION_URL = f"https://{args.host}/api/v1/users/sessions"
@@ -85,7 +88,23 @@ def fetchDeviceID(deviceName):
     print(f"Device '{deviceName}' not found")
     quit();
 
-###### Step 3: Get Ready To Start Capturing Images
+IMAGE_UPLOAD_URL = f"https://{args.host}/api/v1/devices/images?uuid={fetchDeviceID(args.device)}"
+
+###### Step 3: Connect to MQTT Broker
+
+def on_connect(client, userdata, flags, rc):
+    debug("MQTT Connected: " + str(rc))
+    
+mqtt = MQTT_Client.Client()
+
+mqtt.on_connect = on_connect
+mqtt.tls_set(args.cert)
+mqtt.tls_insecure_set(True)
+mqtt.connect(args.host, args.mqtt_port, 60)
+
+mqtt.loop_start()
+
+###### Step 4: Get Ready To Start Capturing Images
 
 debug(f"starting camera({args.width}x{args.height})")
 
@@ -96,7 +115,6 @@ camera = PiCamera(
 camera.start_preview()
 
 CAPTURE_PATH  = "/tmp/mvi-edge-caputure.jpg"
-IMAGE_UPLOAD_URL = f"https://{args.host}/api/v1/devices/images?uuid={fetchDeviceID(args.device)}"
 
 def uploadCameraImage():
     camera.capture(CAPTURE_PATH)
@@ -115,9 +133,9 @@ def uploadCameraImage():
 
 debug("waiting for camera to initialize")
 
-sleep(2) # wait for the camera to warm up
+time.sleep(2) # wait for the camera to warm up
 
-###### Step 4: Capture and upload images as needed...
+###### Step 5: Capture and upload images as needed...
 
 if (args.preview):
 
@@ -129,7 +147,7 @@ if (args.preview):
         count = count + 1
         if (count % 25 == 0):
             debug("", flush = True)
-            sleep(.25)
+            time.sleep(.25)
 
 else:
 
@@ -138,6 +156,19 @@ else:
     count = 0
     while (True):
 
-        id = input(f"({count}) Image ID: ")
+        id = input(f"({count}) Serial # / ID: ")
+
+        if not len(id):
+            id = str(time.time())
+
         uploadCameraImage()
+
+        payload = '{' f'"id":"{id}", "seq": {count}' '}'
+
+        debug(f"\n{args.mqtt_trigger} {payload}\n")
+        
+        # trigger the inspection
+        mqtt.publish(args.mqtt_trigger, payload)
+
         count = count + 1
+        
