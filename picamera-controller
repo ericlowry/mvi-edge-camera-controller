@@ -34,7 +34,9 @@ def debug(msg='', end=None, flush=False):
     
 args = cli.parse_args()
 
-debug(args)
+for key in sorted(args.__dict__):
+    if key != 'password':
+        debug(f"{key} = {args.__dict__[key]}")
 
 # disable an annoying warning
 urllib3.disable_warnings(urllib3.exceptions.SubjectAltNameWarning)
@@ -147,7 +149,7 @@ if (args.preview):
         count = count + 1
         if (count % 25 == 0):
             debug("", flush = True)
-            time.sleep(.25)
+        time.sleep(2)
 
 else:
 
