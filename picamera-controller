@@ -45,29 +45,43 @@ urllib3.disable_warnings(urllib3.exceptions.SubjectAltNameWarning)
 
 SESSION_URL = f"https://{args.host}/api/v1/users/sessions"
 
-def fetchToken():
+TOKEN_LIFE = 9.5 * 60 * 60 # refresh after 9.5 minutes
 
-    debug('fetching access token')
+__lastToken__ = None
+__tokenTime__ = 0
 
-    response = requests.post(
-        SESSION_URL,
-        json = {
-            "grant_type": "password",
-            "password": args.password,
-            "username": args.user
-        },
-        verify = args.cert
-    )
+#
+# token() - fetch an MVI access token (when needed)
+#
+def token():
 
-    if (response.status_code != 200):
-        print(f"HTTP({respnose.status_code}) Unable to log into {args.host}")
-        exit(1)
+    global __lastToken__, __tokenTime__
 
-    body = response.json()
+    # do we need a fresh token?
+    if ( time.time() - __tokenTime__ > TOKEN_LIFE ):
 
-    return body['token']
+        debug('fetching access token')
 
-token = fetchToken()
+        response = requests.post(
+            SESSION_URL,
+            json = {
+                "grant_type": "password",
+                "password": args.password,
+                "username": args.user
+            },
+            verify = args.cert
+        )
+
+        if (response.status_code != 200):
+            print(f"HTTP({respnose.status_code}) Unable to log into {args.host}")
+            exit(1)
+
+        body = response.json()
+
+        __lastToken__ = body['token']
+        __tokenTime__ = time.time()
+
+    return __lastToken__
 
 ###### Step 2: Get the UUID for the requested device
 
@@ -77,7 +91,7 @@ def fetchDeviceID(deviceName):
 
     response = requests.get(
         f"https://{args.host}/api/v1/devices",
-        headers = { "mvie-controller": token },
+        headers = { "mvie-controller": token() },
         verify = args.cert
     )
 
@@ -123,7 +137,7 @@ def uploadCameraImage():
     response = requests.post(
         IMAGE_UPLOAD_URL,
         files = { 'file': ('singleshot.jpg', open(CAPTURE_PATH,'rb') )},
-        headers = { "mvie-controller": token },
+        headers = { "mvie-controller": token() },
         verify = args.cert
     )
 
@@ -165,7 +179,7 @@ else:
 
         uploadCameraImage()
 
-        payload = '{' f'"id":"{id}", "seq": {count}' '}'
+        payload = '{' f'"sn":"{id}", "seq": {count}' '}'
 
         debug(f"\n{args.mqtt_trigger} {payload}\n")
         

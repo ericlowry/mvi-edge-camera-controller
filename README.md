@@ -54,7 +54,21 @@ If the .env configuration file is correct, the camera will start sending preview
 
 Press Ctrl-C to stop sending the preview images.
 
-Step 5: Start the camera controller
+Step 5: Create some pass / fail rules for your inspection
+
+Alert Type: MQTT Checked
+Topic: `alerts/hq-camera-1`
+Message:
+```
+{
+  "sn": "{{.trigger.sn}}",
+  "seq": "{{.trigger.seq}}",
+  "rule": "{{.result.Name}}",
+  "result": "{{.result.Result}}"
+}
+```
+
+Step 6: Start the camera controller
 
 ```
 ./picamera-controller
