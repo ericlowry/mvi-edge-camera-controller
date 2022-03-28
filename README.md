@@ -6,10 +6,11 @@ The application lets you use a rapberry pi with an attached camera as an input d
 
 ### MVI Edge environment
 
-In MVI Edge, create an "Image Folder" input device.
+In MVI Edge, create an *Image Folder* input source.  Name your input source device something like "hq-camera-1"
 
-Create a station and a "Single Shot" triggered inspection using your new input device.  Name your trigger something like "triggers/<device-name>
+Create a station and a *Single Shot* triggered inspection using your new input device.  Name your trigger something like "triggers/hq-camera-1"
 
+Put your inspection into *collecting mode*.
 
 ### Raspberry Pi 4
 
@@ -43,4 +44,21 @@ cp sample.env .env
 nano .env
 ```
 
-Set `MVI
+Step 4: Test the camera configuration
+
+```
+./picamera-controller -v --preview
+```
+
+If the .env configuration file is correct, the camera will start sending preview images to MVI Edge.  You can view the images in MVI Edge by opening the input source and clicking "Test input source".
+
+Press Ctrl-C to stop sending the preview images.
+
+Step 5: Start the camera controller
+
+```
+./picamera-controller
+```
+
+Enter a serial # for the image and press Enter (or just press enter and a number will be generated based on the system time).
+
