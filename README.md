@@ -1,6 +1,7 @@
 # mvi-edge-camera-controller
 
-The application lets you use a rapberry pi with an attached camera as an input device for Maximo Visual Inspection Edge.
+This application lets you use a rapberry pi with an attached camera as an input device for Maximo Visual Inspection Edge.
+It works by uploading images, as needed, to MVI Edge via a REST API.
 
 ## Prerequisites
 
@@ -15,8 +16,11 @@ Put your inspection into *collecting mode*.
 ### Raspberry Pi 4
 
 A Raspberry Pi 4 running 32bit Raspberry Pi OS (picamera) with an attached camera, like the Pi Camera Module 2 or the Pi HQ Camera.
+The Pi needs to be on the same network as the MVI Edge instace.
 
+The following packages need to be installed:
 ```
+sudo apt-get update
 sudo apt-get install python3-picamera
 sudo apt-get install python3-dotenv
 sudo apt-get install python3-paho-mqtt
@@ -52,12 +56,16 @@ Step 4: Test the camera configuration
 
 If the .env configuration file is correct, the camera will start sending preview images to MVI Edge.  You can view the images in MVI Edge by opening the input source and clicking "Test input source".
 
+
 Press Ctrl-C to stop sending the preview images.
+
 
 Step 5: Create some pass / fail rules for your inspection
 
 Alert Type: MQTT Checked
+
 Topic: `alerts/hq-camera-1`
+
 Message:
 ```
 {

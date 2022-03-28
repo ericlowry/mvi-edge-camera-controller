@@ -19,6 +19,7 @@ cli.add_argument('--user', help = 'User Name', default = os.getenv('MVIE_USER') 
 cli.add_argument('--password', help = 'Password', default = os.getenv('MVIE_PASSWORD') )
 cli.add_argument('--cert', help = 'CA Cert File', default = os.getenv('MVIE_CERT') )
 cli.add_argument('--device', help = 'Input Device Name', default = os.getenv('MVIE_DEVICE') )
+cli.add_argument('--token-life', help = 'Maximum Token Life (mins)', type=float, default = 9.5 )
 
 cli.add_argument('--mqtt-port', help = 'MQTT Port', type=int, default = os.getenv('MQTT_PORT') )
 cli.add_argument('--mqtt-trigger', help = 'MQTT Trigger', default = os.getenv('MQTT_TRIGGER') )
@@ -27,6 +28,7 @@ cli.add_argument('--width', help = 'Capture Width', type=int, default=os.getenv(
 cli.add_argument('--height', help = 'Capture Height', type=int, default = os.getenv('PI_CAM_IMAGE_HEIGHT') )
 
 cli.add_argument('--preview', help = 'Preview Mode', action = 'store_true', default = False )
+cli.add_argument('--preview-delay', help = 'Preview Image Delay (secs)', type=float, default = 1.0 )
 
 def debug(msg='', end=None, flush=False):
     if (args.verbose):
@@ -45,7 +47,7 @@ urllib3.disable_warnings(urllib3.exceptions.SubjectAltNameWarning)
 
 SESSION_URL = f"https://{args.host}/api/v1/users/sessions"
 
-TOKEN_LIFE = 9.5 * 60 * 60 # refresh after 9.5 minutes
+TOKEN_LIFE = args.token_life * 60 # token refresh after `args.token_life` minutes (default is 9.5)
 
 __lastToken__ = None
 __tokenTime__ = 0
@@ -161,14 +163,12 @@ if (args.preview):
         uploadCameraImage()
         debug(".", end = '', flush = True)
         count = count + 1
-        if (count % 25 == 0):
+        if (count % 80 == 0):
             debug("", flush = True)
-        time.sleep(2)
+        time.sleep(args.preview_delay)
 
 else:
 
-    debug()
-    
     count = 0
     while (True):
 
@@ -181,7 +181,7 @@ else:
 
         payload = '{' f'"sn":"{id}", "seq": {count}' '}'
 
-        debug(f"\n{args.mqtt_trigger} {payload}\n")
+        debug(f"{args.mqtt_trigger} {payload}")
         
         # trigger the inspection
         mqtt.publish(args.mqtt_trigger, payload)
