@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+
+import sys, os, time
+import requests
+from picamera import PiCamera
+import urllib3
+from dotenv import load_dotenv
+import argparse
+import paho.mqtt.client as MQTT_Client
+
+load_dotenv()
+
+cli = argparse.ArgumentParser( description='Watch MVI Edge Alerts' )
+
+cli.add_argument('--host', help = 'Hostname', default = os.getenv('MVIE_HOST') )
+cli.add_argument('--cert', help = 'CA Cert File', default = os.getenv('MVIE_CERT') )
+cli.add_argument('--device', help = 'Input Device Name', default = os.getenv('MVIE_DEVICE') )
+
+cli.add_argument('--mqtt-port', help = 'MQTT Port', type=int, default = os.getenv('MQTT_PORT') )
+cli.add_argument('--mqtt-trigger', help = 'MQTT Trigger', default = os.getenv('MQTT_TRIGGER') )
+
+args = cli.parse_args()
+
+def on_connect(client, userdata, flags, rc):
+    print("MQTT Connected")
+
+def on_message(client, userdata, message):
+    print(f"> {message.topic}")
+    print(str(message.payload.decode("utf-8")))
+    print('--------------------')
+    
+mqtt = MQTT_Client.Client()
+
+mqtt.on_connect = on_connect
+mqtt.on_message = on_message
+
+mqtt.tls_set(args.cert)
+mqtt.tls_insecure_set(True)
+mqtt.connect(args.host, args.mqtt_port, 60)
+mqtt.loop_start()
+
+mqtt.subscribe(f'triggers/{args.device}')
+mqtt.subscribe(f'alerts/{args.device}')
+
+while True:
+    time.sleep(1)
