@@ -22,7 +22,8 @@ cli.add_argument('--device', help = 'Input Device Name', default = os.getenv('MV
 cli.add_argument('--token-life', help = 'Maximum Token Life (mins)', type=float, default = 9.5 )
 
 cli.add_argument('--mqtt-port', help = 'MQTT Port', type=int, default = os.getenv('MQTT_PORT') )
-cli.add_argument('--mqtt-trigger', help = 'MQTT Trigger', default = os.getenv('MQTT_TRIGGER') )
+cli.add_argument('--mqtt-pub-topic', help = 'MQTT Publish (Trigger) Topic', default = os.getenv('MQTT_PUB_TOPIC') )
+cli.add_argument('--mqtt-sub-topic', help = 'MQTT Subscribe (Gateway) Topic', default = os.getenv('MQTT_PUB_TOPIC') )
 
 cli.add_argument('--width', help = 'Capture Width', type=int, default=os.getenv('PI_CAM_IMAGE_WIDTH') )
 cli.add_argument('--height', help = 'Capture Height', type=int, default = os.getenv('PI_CAM_IMAGE_HEIGHT') )
@@ -181,10 +182,10 @@ else:
 
         payload = '{' f'"sn":"{id}", "seq": {count}' '}'
 
-        debug(f"{args.mqtt_trigger} {payload}")
+        debug(f"{args.mqtt_pub_topic} {payload}")
         
         # trigger the inspection
-        mqtt.publish(args.mqtt_trigger, payload)
+        mqtt.publish(args.mqtt_pub_topic, payload)
 
         count = count + 1
         
