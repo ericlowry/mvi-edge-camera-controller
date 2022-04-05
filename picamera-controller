@@ -7,6 +7,7 @@ import urllib3
 from dotenv import load_dotenv
 import argparse
 import paho.mqtt.client as MQTT_Client
+import json
 
 load_dotenv()
 
@@ -23,7 +24,7 @@ cli.add_argument('--token-life', help = 'Maximum Token Life (mins)', type=float,
 
 cli.add_argument('--mqtt-port', help = 'MQTT Port', type=int, default = os.getenv('MQTT_PORT') )
 cli.add_argument('--mqtt-pub-topic', help = 'MQTT Publish (Trigger) Topic', default = os.getenv('MQTT_PUB_TOPIC') )
-cli.add_argument('--mqtt-sub-topic', help = 'MQTT Subscribe (Gateway) Topic', default = os.getenv('MQTT_PUB_TOPIC') )
+cli.add_argument('--mqtt-sub-topic', help = 'MQTT Subscribe (Gateway) Topic', default = os.getenv('MQTT_SUB_TOPIC') )
 
 cli.add_argument('--width', help = 'Capture Width', type=int, default=os.getenv('PI_CAM_IMAGE_WIDTH') )
 cli.add_argument('--height', help = 'Capture Height', type=int, default = os.getenv('PI_CAM_IMAGE_HEIGHT') )
@@ -109,20 +110,6 @@ def fetchDeviceID(deviceName):
 
 IMAGE_UPLOAD_URL = f"https://{args.host}/api/v1/devices/images?uuid={fetchDeviceID(args.device)}"
 
-###### Step 3: Connect to MQTT Broker
-
-def on_connect(client, userdata, flags, rc):
-    debug("MQTT Connected: " + str(rc))
-    
-mqtt = MQTT_Client.Client()
-
-mqtt.on_connect = on_connect
-mqtt.tls_set(args.cert)
-mqtt.tls_insecure_set(True)
-mqtt.connect(args.host, args.mqtt_port, 60)
-
-mqtt.loop_start()
-
 ###### Step 4: Get Ready To Start Capturing Images
 
 debug(f"starting camera({args.width}x{args.height})")
@@ -150,11 +137,48 @@ def uploadCameraImage():
 
     return True
 
-debug("waiting for camera to initialize")
+imageSequence = 0
+def processImage(imageId):
+    global imageSequence
+    if not len(imageId):
+        imageId = str(time.time()) # if needed generate a unique imageId
+    uploadCameraImage()
+    payload = {
+        "sn": imageId,
+        "seq": imageSequence
+    }
+    debug(f"{args.mqtt_pub_topic} {json.dumps(payload)}")
+    mqtt.publish(args.mqtt_pub_topic, json.dumps(payload)) # trigger the inspection
+    imageSequence = imageSequence + 1
+    
+###### Step 3: Connect to MQTT Broker
 
-time.sleep(2) # wait for the camera to warm up
+def on_connect(client, userdata, flags, rc):
+    debug("MQTT Connected: " + str(rc))
+
+def on_message(client, userdata, message):
+    id = str(message.payload.decode('utf-8'))
+    print(id)
+    processImage(id)
+    
+mqtt = MQTT_Client.Client()
+
+mqtt.on_connect = on_connect
+mqtt.on_message = on_message
+
+mqtt.tls_set(args.cert)
+mqtt.tls_insecure_set(True)
+mqtt.connect(args.host, args.mqtt_port, 60)
+
+mqtt.subscribe(args.mqtt_sub_topic)
+debug(f"Listening for barcodes on {args.mqtt_sub_topic}")
+
+mqtt.loop_start()
 
 ###### Step 5: Capture and upload images as needed...
+
+debug("waiting for camera to initialize")
+time.sleep(2) # wait for the camera to warm up
 
 if (args.preview):
 
@@ -170,22 +194,8 @@ if (args.preview):
 
 else:
 
-    count = 0
+    print("Enter a Serial # / Unique ID")
     while (True):
-
-        id = input(f"({count}) Serial # / ID: ")
-
-        if not len(id):
-            id = str(time.time())
-
-        uploadCameraImage()
-
-        payload = '{' f'"sn":"{id}", "seq": {count}' '}'
-
-        debug(f"{args.mqtt_pub_topic} {payload}")
-        
-        # trigger the inspection
-        mqtt.publish(args.mqtt_pub_topic, payload)
-
-        count = count + 1
+        id = input(f"")
+        processImage(id)
         
