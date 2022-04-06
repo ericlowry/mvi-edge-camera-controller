@@ -26,8 +26,9 @@ cli.add_argument('--mqtt-port', help = 'MQTT Port', type=int, default = os.geten
 cli.add_argument('--mqtt-pub-topic', help = 'MQTT Publish (Trigger) Topic', default = os.getenv('MQTT_PUB_TOPIC') )
 cli.add_argument('--mqtt-sub-topic', help = 'MQTT Subscribe (Gateway) Topic', default = os.getenv('MQTT_SUB_TOPIC') )
 
-cli.add_argument('--width', help = 'Capture Width', type=int, default=os.getenv('PI_CAM_IMAGE_WIDTH') )
-cli.add_argument('--height', help = 'Capture Height', type=int, default = os.getenv('PI_CAM_IMAGE_HEIGHT') )
+cli.add_argument('--picam-img-width', help = 'Capture Width', type=int, default=os.getenv('PICAM_IMAGE_WIDTH') )
+cli.add_argument('--picam-img-height', help = 'Capture Height', type=int, default = os.getenv('PICAM_IMAGE_HEIGHT') )
+cli.add_argument('--picam-img-rotation', help = 'Capture Rotation', type=int, default=os.getenv('PICAM_IMAGE_ROTATION') )
 
 cli.add_argument('--preview', help = 'Preview Mode', action = 'store_true', default = False )
 cli.add_argument('--preview-delay', help = 'Preview Image Delay (secs)', type=float, default = 1.0 )
@@ -112,11 +113,13 @@ IMAGE_UPLOAD_URL = f"https://{args.host}/api/v1/devices/images?uuid={fetchDevice
 
 ###### Step 4: Get Ready To Start Capturing Images
 
-debug(f"starting camera({args.width}x{args.height})")
+debug(f"starting camera({args.picam_img_width}x{args.picam_img_height})")
 
 camera = PiCamera(
-    resolution = ( args.width, args.height )
+    resolution = ( args.picam_img_width, args.picam_img_height )
 )
+
+camera.rotation = args.picam_img_rotation
 
 camera.start_preview()
 
