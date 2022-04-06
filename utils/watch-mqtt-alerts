@@ -25,8 +25,9 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, message):
     print(f"> {message.topic}")
-    print(str(message.payload.decode("utf-8")))
-    print('--------------------')
+    payload = message.payload.decode("utf-8")
+    print(payload)
+    print('---')
     
 mqtt = MQTT_Client.Client()
 
@@ -38,8 +39,7 @@ mqtt.tls_insecure_set(True)
 mqtt.connect(args.host, args.mqtt_port, 60)
 mqtt.loop_start()
 
-mqtt.subscribe(f'triggers/{args.device}')
-mqtt.subscribe(f'alerts/{args.device}')
+mqtt.subscribe(f'+/{args.device}')
 
 while True:
     time.sleep(1)

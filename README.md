@@ -69,10 +69,14 @@ Topic: `alerts/hq-camera-1`
 Message:
 ```
 {
-  "sn": "{{.trigger.sn}}",
-  "seq": "{{.trigger.seq}}",
-  "rule": "{{.result.Name}}",
-  "result": "{{.result.Result}}"
+"sn": "{{.trigger.sn}}",
+"seq": "{{.trigger.seq}}",
+"station": "{{.context.Metadata.Station}}",
+"inspection": "{{.context.Metadata.Inspection}}",
+"rule": "{{.result.Name}}",
+"inspectionUUID":"{{.context.Metadata.InspectionUUID}}",
+"imageID": "{{.image.ID}}",
+"result": "{{.result.Result}}"
 }
 ```
 
