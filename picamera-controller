@@ -147,8 +147,8 @@ def processImage(imageId):
         imageId = str(time.time()) # if needed generate a unique imageId
     uploadCameraImage()
     payload = {
-        "sn": imageId,
-        "seq": imageSequence
+        "SN": imageId,
+        "Seq": imageSequence
     }
     debug(f"{args.mqtt_pub_topic} {json.dumps(payload)}")
     mqtt.publish(args.mqtt_pub_topic, json.dumps(payload)) # trigger the inspection

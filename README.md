@@ -35,10 +35,10 @@ git clone git@github.ibm.com:elowry/mvi-edge-camera-controller.git
 cd mvi-edge-camera-controller
 ```
 
-Step 2: Get a copy of your MVI Edge environment's certificat:
+Step 2: Get a copy of your MVI Edge environment's certificate:
 
 ```
-sftp mvi-edge:/opt/ibm/vision-edge/volume/run/var/config/.ssl/visionedgeca.crt
+sftp <mvi-edge-host>:/opt/ibm/vision-edge/volume/run/var/config/.ssl/visionedgeca.crt .
 ```
 
 Step 3: Configure the controller for your MVI Edge instance
@@ -62,29 +62,39 @@ Press Ctrl-C to stop sending the preview images.
 
 Step 5: Create some pass / fail rules for your inspection
 
-Alert Type: MQTT Checked
+Alert Type: MQTT
 
 Topic: `alerts/hq-camera-1`
 
 Message:
 ```
 {
-"sn": "{{.trigger.sn}}",
-"seq": "{{.trigger.seq}}",
-"station": "{{.context.Metadata.Station}}",
-"inspection": "{{.context.Metadata.Inspection}}",
-"rule": "{{.result.Name}}",
-"inspectionUUID":"{{.context.Metadata.InspectionUUID}}",
-"imageID": "{{.image.ID}}",
-"result": "{{.result.Result}}"
+  "SN": "{{.trigger.SN}}",
+  "Seq": "{{.trigger.Seq}}",
+  "Station": "{{.context.Metadata.Station}}",
+  "Inspection": "{{.context.Metadata.Inspection}}",
+  "Rule": "{{.result.Name}}",
+  "InspectionUUID": "{{.context.Metadata.InspectionUUID}}",
+  "ImageID": "{{.image.ID}}",
+  "ObjectCount":"{{.result.ObjectCount}}",
+  "Objects":[
+    {{range $j, $obj := .result.FilteredResults}}{{if gt $j 0}},
+    {{end}}{
+    "Label":"{{$obj.Label.Name}}",
+    "Score": {{$obj.Score}},
+    "Rect": [ {{$obj.Rectangle.Min.X}}, {{$obj.Rectangle.Min.Y}}, {{$obj.Rectangle.Max.X}}, {{$obj.Rectangle.Max.Y}} ]
+    }{{end}}
+  ],
+  "Result": "{{.result.Result}}"
 }
 ```
 
-Step 6: Start the camera controller
+Step 6: Enable the inspection via the edge Web UI
+
+Step 7: Start the camera controller
 
 ```
 ./picamera-controller
 ```
 
 Enter a serial # for the image and press Enter (or just press enter and a number will be generated based on the system time).
-
