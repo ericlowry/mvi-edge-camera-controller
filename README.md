@@ -3,7 +3,7 @@
 This application lets you use a rapberry pi with an attached camera as an input device for Maximo Visual Inspection Edge.
 It works by uploading images, as needed, to MVI Edge via a REST API.  It also demonstrates a sample workflow for handling a bar code scanner that initiates an inspection and embeds the scanned data in the inspections.
 
-![MVI Edge Example Solution](https://github.ibm.com/elowry/mvi-edge-camera-controller/blob/main/docs/solution.drawio.png?raw=true)
+![MVI Edge Example Solution](docs/solution.drawio.png)
 
 ## Prerequisites
 
